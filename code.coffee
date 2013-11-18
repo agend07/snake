@@ -87,8 +87,20 @@ class Snake
         while segment
             if segment.x == point.x and segment.y == point.y
                 return true
+
+            if point.x > 59 or point.x < 0 or point.y < 0 or point.y > 39
+                return true
+
             segment = segment.next
         return false
+
+    countNeighbours: (point) ->
+        result = 0
+        if @checkPoint new Point(point.x, point.y+1) then result++
+        if @checkPoint new Point(point.x, point.y-1) then result++
+        if @checkPoint new Point(point.x+1, point.y) then result++
+        if @checkPoint new Point(point.x-1, point.y) then result++
+        result
   
 
 
@@ -101,7 +113,7 @@ class Game
         @food = @addFood()
 
         processCallback = @process.bind(this)
-        @processing = setInterval processCallback, 100
+        @processing = setInterval processCallback, 30
 
     randomInt: (lower, upper) ->
         start = Math.random()
@@ -170,7 +182,6 @@ class Game
             left: new Point(x-1, y)
             right: new Point(x+1, y)
 
-        filtered = {}
         for own key, value of directions
             if @snake.checkPoint value
                 delete directions[key]
@@ -178,6 +189,20 @@ class Game
         distances = {}
         for own key, value of directions
             distances[key] = @food.distance(value)
+            neighbours = @snake.countNeighbours(value)
+            if neighbours == 3
+                delete distances[key]
+
+        # neighbours = {}
+        # for own key, value of directions
+        #     neighbours[key] = @snake.countNeighbours(value)
+
+        # check for dead end - 
+        # policz sasiedów dla punktu
+
+        # debugger
+
+        
 
         bestWay = null
         for own key, value of distances

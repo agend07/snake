@@ -158,9 +158,30 @@
         if (segment.x === point.x && segment.y === point.y) {
           return true;
         }
+        if (point.x > 59 || point.x < 0 || point.y < 0 || point.y > 39) {
+          return true;
+        }
         segment = segment.next;
       }
       return false;
+    };
+
+    Snake.prototype.countNeighbours = function(point) {
+      var result;
+      result = 0;
+      if (this.checkPoint(new Point(point.x, point.y + 1))) {
+        result++;
+      }
+      if (this.checkPoint(new Point(point.x, point.y - 1))) {
+        result++;
+      }
+      if (this.checkPoint(new Point(point.x + 1, point.y))) {
+        result++;
+      }
+      if (this.checkPoint(new Point(point.x - 1, point.y))) {
+        result++;
+      }
+      return result;
     };
 
     return Snake;
@@ -176,7 +197,7 @@
       this.snake = new Snake;
       this.food = this.addFood();
       processCallback = this.process.bind(this);
-      this.processing = setInterval(processCallback, 100);
+      this.processing = setInterval(processCallback, 30);
     }
 
     Game.prototype.randomInt = function(lower, upper) {
@@ -231,7 +252,7 @@
     };
 
     Game.prototype.think = function() {
-      var bestWay, directions, distances, filtered, key, value, x, y;
+      var bestWay, directions, distances, key, neighbours, value, x, y;
       x = this.snake.head.x;
       y = this.snake.head.y;
       directions = {
@@ -240,7 +261,6 @@
         left: new Point(x - 1, y),
         right: new Point(x + 1, y)
       };
-      filtered = {};
       for (key in directions) {
         if (!__hasProp.call(directions, key)) continue;
         value = directions[key];
@@ -253,6 +273,10 @@
         if (!__hasProp.call(directions, key)) continue;
         value = directions[key];
         distances[key] = this.food.distance(value);
+        neighbours = this.snake.countNeighbours(value);
+        if (neighbours === 3) {
+          delete distances[key];
+        }
       }
       bestWay = null;
       for (key in distances) {
