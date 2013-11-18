@@ -10,6 +10,9 @@ class Canvas
         @ctx.fillStyle = @background
         @ctx.fillRect 0, 0, @width, @height
 
+class Point
+    constructor: (@x, @y) ->
+
 class Food
     constructor: (@x, @y, @color='orange', @value=3) ->
 
@@ -17,6 +20,10 @@ class Food
         ctx.fillStyle = @color
         ctx.fillRect @x * 10, @y * 10, 10, 10 
 
+    distance: (point) ->
+        deltaX = (@x - point.x)
+        deltaY = (@y - point.y)
+        deltaX * deltaX + deltaY * deltaY
 
 class SnakeSegment
     constructor: (@x, @y, @next=null) ->
@@ -74,10 +81,20 @@ class Snake
             segment = segment.next
         return false
 
+    checkPoint: (point) ->
+        segment = @head.next
+
+        while segment
+            if segment.x == point.x and segment.y == point.y
+                return true
+            segment = segment.next
+        return false
+  
+
 
 class Game
     constructor: ->
-        @armKeyboard()
+        # @armKeyboard()
         @canvas = new Canvas
         @canvas.clear()
         @snake = new Snake
@@ -90,12 +107,12 @@ class Game
         start = Math.random()
         Math.floor(start * (upper - lower + 1) + lower)
 
-    armKeyboard: ->
-        document.addEventListener 'keydown', (e) =>
-            if e.keyCode == 37 and @snake.direction != 'right' then @snake.direction = 'left'
-            if e.keyCode == 39 and @snake.direction != 'left' then @snake.direction = 'right'
-            if e.keyCode == 38 and @snake.direction != 'down' then @snake.direction = 'up'
-            if e.keyCode == 40 and @snake.direction != 'up' then @snake.direction = 'down'
+    # armKeyboard: ->
+    #     document.addEventListener 'keydown', (e) =>
+    #         if e.keyCode == 37 and @snake.direction != 'right' then @snake.direction = 'left'
+    #         if e.keyCode == 39 and @snake.direction != 'left' then @snake.direction = 'right'
+    #         if e.keyCode == 38 and @snake.direction != 'down' then @snake.direction = 'up'
+    #         if e.keyCode == 40 and @snake.direction != 'up' then @snake.direction = 'down'
           
     checkCollision: ->
         if @snake.head.x == @food.x and @snake.head.y == @food.y
@@ -131,6 +148,8 @@ class Game
         document.getElementsByTagName('body')[0].className += ' tragedy'
 
     process: ->
+        @think()
+
         @snake.move()
         if @checkCollision()
             return
@@ -138,7 +157,37 @@ class Game
         @canvas.clear()
         @snake.paint(@canvas.ctx)
         @food.paint(@canvas.ctx)
-        console.log @snake.head.x, @snake.head.y 
+        # console.log @snake.head.x, @snake.head.y
+
+
+    think: () ->
+        x = @snake.head.x
+        y = @snake.head.y
+
+        directions = 
+            up: new Point(x, y-1)
+            down: new Point(x, y+1)
+            left: new Point(x-1, y)
+            right: new Point(x+1, y)
+
+        filtered = {}
+        for own key, value of directions
+            if @snake.checkPoint value
+                delete directions[key]
+
+        distances = {}
+        for own key, value of directions
+            distances[key] = @food.distance(value)
+
+        bestWay = null
+        for own key, value of distances
+            if !bestWay then bestWay = key
+
+            if distances[bestWay] > value
+                bestWay = key
+
+        if bestWay
+            @snake.direction = bestWay
 
 window.start = () ->
     game = new Game
