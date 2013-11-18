@@ -10,3 +10,7 @@ body {
 canvas {
    display: inline;
 }
+
+.tragedy {
+    background-color: black
+}

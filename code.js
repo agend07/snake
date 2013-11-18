@@ -60,10 +60,11 @@
 
   Snake = (function() {
 
-    function Snake(direction, color) {
+    function Snake(direction, color, headColor) {
       var middle, tail;
       this.direction = direction != null ? direction : 'left';
       this.color = color != null ? color : 'green';
+      this.headColor = headColor != null ? headColor : 'red';
       tail = new SnakeSegment(12, 10);
       middle = new SnakeSegment(11, 10, tail);
       this.head = new SnakeSegment(10, 10, middle);
@@ -102,13 +103,33 @@
 
     Snake.prototype.paint = function(ctx) {
       var segment, _results;
-      segment = this.head;
+      this.head.paint(ctx, this.headColor);
+      segment = this.head.next;
       _results = [];
       while (segment) {
         segment.paint(ctx, this.color);
         _results.push(segment = segment.next);
       }
       return _results;
+    };
+
+    Snake.prototype.checkPosition = function(x, y, head) {
+      var segment;
+      if (head == null) {
+        head = true;
+      }
+      if (head) {
+        segment = this.head;
+      } else {
+        segment = this.head.next;
+      }
+      while (segment) {
+        if (segment.x === x && segment.y === y) {
+          return true;
+        }
+        segment = segment.next;
+      }
+      return false;
     };
 
     return Snake;
@@ -123,23 +144,31 @@
       this.canvas = new Canvas;
       this.canvas.clear();
       this.snake = new Snake;
-      this.food = new Food(20, 20, 'orange', 10);
+      this.food = this.addFood();
       processCallback = this.process.bind(this);
-      setInterval(processCallback, 100);
+      this.processing = setInterval(processCallback, 100);
     }
+
+    Game.prototype.randomInt = function(lower, upper) {
+      var start;
+      start = Math.random();
+      return Math.floor(start * (upper - lower + 1) + lower);
+    };
 
     Game.prototype.armKeyboard = function() {
       var _this = this;
       return document.addEventListener('keydown', function(e) {
-        switch (e.keyCode) {
-          case 37:
-            return _this.snake.direction = 'left';
-          case 39:
-            return _this.snake.direction = 'right';
-          case 38:
-            return _this.snake.direction = 'up';
-          case 40:
-            return _this.snake.direction = 'down';
+        if (e.keyCode === 37 && _this.snake.direction !== 'right') {
+          _this.snake.direction = 'left';
+        }
+        if (e.keyCode === 39 && _this.snake.direction !== 'left') {
+          _this.snake.direction = 'right';
+        }
+        if (e.keyCode === 38 && _this.snake.direction !== 'down') {
+          _this.snake.direction = 'up';
+        }
+        if (e.keyCode === 40 && _this.snake.direction !== 'up') {
+          return _this.snake.direction = 'down';
         }
       });
     };
@@ -147,16 +176,46 @@
     Game.prototype.checkCollision = function() {
       if (this.snake.head.x === this.food.x && this.snake.head.y === this.food.y) {
         console.log('eaten');
-        return this.snake.extra = this.food.value;
+        this.snake.extra = this.food.value;
+        this.food = this.addFood();
       }
+      if (this.snake.checkPosition(this.snake.head.x, this.snake.head.y, false)) {
+        this.gameOver();
+        return true;
+      }
+      if (this.snake.head.x < 0 || this.snake.head.x > 59 || this.snake.head.y < 0 || this.snake.head.y > 39) {
+        this.gameOver();
+        return true;
+      }
+      return false;
+    };
+
+    Game.prototype.addFood = function() {
+      var x, y;
+      while (true) {
+        x = this.randomInt(0, 59);
+        y = this.randomInt(0, 39);
+        if (!this.snake.checkPosition(x, y)) {
+          break;
+        }
+      }
+      return new Food(x, y, 'orange', 10);
+    };
+
+    Game.prototype.gameOver = function() {
+      clearInterval(this.processing);
+      return document.getElementsByTagName('body')[0].className += ' tragedy';
     };
 
     Game.prototype.process = function() {
       this.snake.move();
+      if (this.checkCollision()) {
+        return;
+      }
       this.canvas.clear();
       this.snake.paint(this.canvas.ctx);
       this.food.paint(this.canvas.ctx);
-      return this.checkCollision();
+      return console.log(this.snake.head.x, this.snake.head.y);
     };
 
     return Game;
