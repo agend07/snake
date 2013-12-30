@@ -1,6 +1,31 @@
+width = 60
+height = 40
+
+backgroundColor = 'white'
+headColor = 'red'
+snakeColor = 'orange'
+
+class Board
+    constructor: ->
+        @array = []
+
+        for _ in [0...height]
+            row = []
+            for _ in [0...width]
+                row.push 1
+
+            @array.push row
+
+    clear: ->
+        for x in [0...height]
+            for y in [0...width]
+                console.log 'setting: ', x, y
+                @array[x][y] = 0
+
+
 class Canvas
-    width: 600
-    height: 400
+    width: width * 10
+    height: height * 10
 
     constructor: (@background='white')->
         @canvas = document.getElementById 'myCanvas'
@@ -10,8 +35,25 @@ class Canvas
         @ctx.fillStyle = @background
         @ctx.fillRect 0, 0, @width, @height
 
+    paint: (board) ->
+        for x in [0...height]
+            for y in [0...width]
+                console.log 'painting: ', x, y
+                cell = @array[x][y]
+
+                if cell == '0'
+                    @ctx.fillStyle = backgroundColor
+                else if cell == '1'
+                    @ctx.fillStyle = snakeColor
+                else if cell == '2'
+                    @ctx.fillStyle = headColor
+                
+                ctx.fillRect x * 10, y * 10, 10, 10 
+
+
 class Point
     constructor: (@x, @y) ->
+
 
 class Food
     constructor: (@x, @y, @color='orange', @value=3) ->
@@ -25,6 +67,7 @@ class Food
         deltaY = (@y - point.y)
         deltaX * deltaX + deltaY * deltaY
 
+
 class SnakeSegment
     constructor: (@x, @y, @next=null) ->
 
@@ -34,7 +77,6 @@ class SnakeSegment
 
 
 class Snake
-
     constructor: (@direction='left', @color='green', @headColor='red') ->
         tail = new SnakeSegment(12, 10)
         middle = new SnakeSegment(11, 10, tail)
@@ -67,7 +109,7 @@ class Snake
             segment.paint(ctx, @color)
             segment = segment.next
 
-    checkPosition: (x, y, head=true) ->
+    bitHimself: (x, y, head=true) ->
         # if snake takes this position return true
 
         if head
@@ -81,7 +123,7 @@ class Snake
             segment = segment.next
         return false
 
-    checkPoint: (point) ->
+    checkPointIsOccupied: (point) ->
         segment = @head.next
 
         while segment
@@ -96,10 +138,10 @@ class Snake
 
     countNeighbours: (point) ->
         result = 0
-        if @checkPoint new Point(point.x, point.y+1) then result++
-        if @checkPoint new Point(point.x, point.y-1) then result++
-        if @checkPoint new Point(point.x+1, point.y) then result++
-        if @checkPoint new Point(point.x-1, point.y) then result++
+        if @checkPointIsOccupied new Point(point.x, point.y+1) then result++
+        if @checkPointIsOccupied new Point(point.x, point.y-1) then result++
+        if @checkPointIsOccupied new Point(point.x+1, point.y) then result++
+        if @checkPointIsOccupied new Point(point.x-1, point.y) then result++
         result
   
 
@@ -111,6 +153,12 @@ class Game
         @canvas.clear()
         @snake = new Snake
         @food = @addFood()
+
+        @board = new Board
+        console.log @board
+
+        @board.clear()
+        console.log @board
 
         processCallback = @process.bind(this)
         @processing = setInterval processCallback, 30
@@ -132,7 +180,7 @@ class Game
             @snake.extra = @food.value
             @food = @addFood()
 
-        if @snake.checkPosition(@snake.head.x, @snake.head.y, false)
+        if @snake.bitHimself(@snake.head.x, @snake.head.y, false)
             @gameOver()
             return true
 
@@ -150,7 +198,7 @@ class Game
             y = @randomInt(0, 39)
 
             # check if x,y is available
-            if not @snake.checkPosition(x, y)
+            if not @snake.bitHimself(x, y)
                 break
 
         new Food(x, y, 'orange', 10)
@@ -171,6 +219,27 @@ class Game
         @food.paint(@canvas.ctx)
         # console.log @snake.head.x, @snake.head.y
 
+    checkFourPointsAround: (point) ->
+        # ta funkcja musi wiedzieć co jest już zajęte przez zamalowane punkty, nie tylko węża
+        # jak to zrobić - pierwsza myśl albo rekurencja??? - albo muszę pamiętać z której strony powstał punkt?
+        # albo mieć listę punktów i sprawdzać węża, border i te punkty - może tak byłoby najłatwiej
+
+    checkForClosedSpace: (direction) ->
+        # console.log direction
+        # if there is more space then snakes length it might be allright
+
+        # i dont have to worry about food, only snake body, and borders
+
+        # it would help if i paint the closed space for some color
+
+        # i know where the snake is, know where the borders are, so i start with the head and start counting
+        # for example start left - if it works - it is empty - add this point to list
+        # from this point try to paint another 4 points around
+        # if it works i have four - not gonna happen but 3 or less new points
+        # and as many this new points i have to try - and as long as i get new points
+        
+        # need to have the board with chosen direction - so like would it look like if snake took this path
+        # and see 
 
     think: () ->
         x = @snake.head.x
@@ -182,37 +251,71 @@ class Game
             left: new Point(x-1, y)
             right: new Point(x+1, y)
 
+        # if some direction is illegal it will be deleted - like snake body or outside the board
         for own key, value of directions
-            if @snake.checkPoint value
+            if @snake.checkPointIsOccupied value
                 delete directions[key]
 
-        distances = {}
+        # filter directions instead of distances
         for own key, value of directions
-            distances[key] = @food.distance(value)
+            if @checkForClosedSpace value
+                delete directions[key]
+
+        distances = []
+
+
+        for own key, value of directions
+            distance = @food.distance(value)
             neighbours = @snake.countNeighbours(value)
-            if neighbours == 3
-                delete distances[key]
+            if neighbours < 3
+                distances.push([key, distance])
 
-        # neighbours = {}
-        # for own key, value of directions
-        #     neighbours[key] = @snake.countNeighbours(value)
 
-        # check for dead end - 
-        # policz sasiedów dla punktu
 
-        # debugger
+        distances.sort (a, b) ->
+            a[1] - b[1]
 
-        
+        if distances.length > 0
+            @snake.direction = distances[0][0]
 
-        bestWay = null
-        for own key, value of distances
-            if !bestWay then bestWay = key
 
-            if distances[bestWay] > value
-                bestWay = key
+    # think2: () ->
+    #     x = @snake.head.x
+    #     y = @snake.head.y
 
-        if bestWay
-            @snake.direction = bestWay
+    #     directions = 
+    #         up: new Point(x, y-1)
+    #         down: new Point(x, y+1)
+    #         left: new Point(x-1, y)
+    #         right: new Point(x+1, y)
+
+
+    #     # if some direction is illegal it will be deleted - like snake body or outside the board
+    #     for own key, value of directions
+    #         if @snake.checkPointIsOccupied value
+    #             delete directions[key]
+
+    #     distances = []
+
+    #     for own key, value of directions
+    #         distance = @food.distance(value)
+    #         neighbours = @snake.countNeighbours(value)
+    #         if neighbours < 3
+    #             distances.push([key, distance])
+
+    #     distances.sort (a, b) ->
+    #         a[1] - b[1]
+
+    #     if distances.length > 1 and @snake.direction == distances[1][0] and @snake.lastDistance > distances[1][1]
+    #         @snake.lastDistance = distances[1][1]
+    #         bestWay = distances[1][0]
+    #     else 
+    #         bestWay = distances[0][0]
+    #         if distances.length > 1
+    #             @snake.lastDistance = distances[0][0]
+
+    #     if bestWay
+    #         @snake.direction = bestWay
 
 window.start = () ->
     game = new Game
