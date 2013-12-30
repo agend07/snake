@@ -3,7 +3,8 @@ height = 40
 
 backgroundColor = 'white'
 headColor = 'red'
-snakeColor = 'orange'
+snakeColor = 'green'
+foodColor = 'orange'
 
 class Board
     constructor: ->
@@ -12,43 +13,44 @@ class Board
         for _ in [0...height]
             row = []
             for _ in [0...width]
-                row.push 1
+                row.push 0
 
             @array.push row
 
     clear: ->
-        for x in [0...height]
-            for y in [0...width]
-                console.log 'setting: ', x, y
-                @array[x][y] = 0
+        for y in [0...height]
+            for x in [0...width]
+                @set x, y, 0
+
+    get: (x, y) ->
+        @array[y][x]
+
+    set: (x, y, value) ->
+        @array[y][x] = value
 
 
 class Canvas
     width: width * 10
     height: height * 10
 
-    constructor: (@background='white')->
+    constructor: ->
         @canvas = document.getElementById 'myCanvas'
         @ctx = @canvas.getContext '2d'
 
-    clear: ->
-        @ctx.fillStyle = @background
-        @ctx.fillRect 0, 0, @width, @height
+    # clear: ->
+    #     @ctx.fillStyle = backgroundColor
+    #     @ctx.fillRect 0, 0, @width, @height
 
     paint: (board) ->
-        for x in [0...height]
-            for y in [0...width]
-                console.log 'painting: ', x, y
-                cell = @array[x][y]
+        for y in [0...height]
+            for x in [0...width]
+                switch board.get x, y
+                    when 1 then @ctx.fillStyle = snakeColor
+                    when 2 then @ctx.fillStyle = headColor
+                    when 3 then @ctx.fillStyle = foodColor
+                    else @ctx.fillStyle = backgroundColor
 
-                if cell == '0'
-                    @ctx.fillStyle = backgroundColor
-                else if cell == '1'
-                    @ctx.fillStyle = snakeColor
-                else if cell == '2'
-                    @ctx.fillStyle = headColor
-                
-                ctx.fillRect x * 10, y * 10, 10, 10 
+                @ctx.fillRect x * 10, y * 10, 10, 10 
 
 
 class Point
@@ -56,30 +58,31 @@ class Point
 
 
 class Food
-    constructor: (@x, @y, @color='orange', @value=3) ->
+    constructor: (@x, @y, @value=3) ->
 
-    paint: (ctx) ->
-        ctx.fillStyle = @color
-        ctx.fillRect @x * 10, @y * 10, 10, 10 
+    project: (board) ->
+        board.set @x, @y, 3
 
-    distance: (point) ->
-        deltaX = (@x - point.x)
-        deltaY = (@y - point.y)
-        deltaX * deltaX + deltaY * deltaY
+        console.log 'food at', @x, @y
+
+    # paint: (ctx) ->
+    #     ctx.fillStyle = @color
+    #     ctx.fillRect @x * 10, @y * 10, 10, 10 
+
+    # distance: (point) ->
+    #     deltaX = (@x - point.x)
+    #     deltaY = (@y - point.y)
+    #     deltaX * deltaX + deltaY * deltaY
 
 
 class SnakeSegment
     constructor: (@x, @y, @next=null) ->
 
-    paint: (ctx, color) ->
-        ctx.fillStyle = color
-        ctx.fillRect @x * 10, @y * 10, 10, 10 
-
 
 class Snake
-    constructor: (@direction='left', @color='green', @headColor='red') ->
-        tail = new SnakeSegment(12, 10)
-        middle = new SnakeSegment(11, 10, tail)
+    constructor: (@direction='down') ->
+        tail = new SnakeSegment(10, 12)
+        middle = new SnakeSegment(10, 11, tail)
         @head = new SnakeSegment(10, 10, middle)
 
     move: ->
@@ -90,11 +93,15 @@ class Snake
             when 'down' then new SnakeSegment(@head.x, @head.y+1, @head)
 
         @head = newHead
+        # I dont move the snake - I add a new head in front
 
+        # if food was eaten and there are new segments I'm done for this cycle
         if @extra > 0
             @extra--
             return
 
+
+        # remove last segment 
         segment = @head
         while segment
             if segment.next and not segment.next.next
@@ -102,26 +109,29 @@ class Snake
                 break
             segment = segment.next
 
-    paint: (ctx) ->
-        @head.paint(ctx, @headColor)
+    project: (board) ->
+        # board.array[@head.x][@head.y] = 2
+        board.set @head.x, @head.y, 2
+
         segment = @head.next
         while segment
-            segment.paint(ctx, @color)
+            # board.array[segment.x][segment.y] = 1
+            board.set segment.x, segment.y, 1
             segment = segment.next
 
-    bitHimself: (x, y, head=true) ->
-        # if snake takes this position return true
+    # bitHimself: (x, y, head=true) ->
+    #     # if snake takes this position return true
 
-        if head
-            segment = @head
-        else
-            segment = @head.next
+    #     if head
+    #         segment = @head
+    #     else
+    #         segment = @head.next
 
-        while segment
-            if segment.x == x and segment.y == y
-                return true
-            segment = segment.next
-        return false
+    #     while segment
+    #         if segment.x == x and segment.y == y
+    #             return true
+    #         segment = segment.next
+    #     return false
 
     checkPointIsOccupied: (point) ->
         segment = @head.next
@@ -150,15 +160,16 @@ class Game
     constructor: ->
         # @armKeyboard()
         @canvas = new Canvas
-        @canvas.clear()
-        @snake = new Snake
-        @food = @addFood()
-
         @board = new Board
-        console.log @board
+        @snake = new Snake
 
-        @board.clear()
-        console.log @board
+
+        @snake.project @board
+
+        @food = @addFood @board
+        @food.project @board
+
+        @canvas.paint @board
 
         processCallback = @process.bind(this)
         @processing = setInterval processCallback, 30
@@ -174,49 +185,54 @@ class Game
     #         if e.keyCode == 38 and @snake.direction != 'down' then @snake.direction = 'up'
     #         if e.keyCode == 40 and @snake.direction != 'up' then @snake.direction = 'down'
           
-    checkCollision: ->
-        if @snake.head.x == @food.x and @snake.head.y == @food.y
-            console.log 'eaten'
-            @snake.extra = @food.value
-            @food = @addFood()
+    # checkCollision: ->
+    #     if @snake.head.x == @food.x and @snake.head.y == @food.y
+    #         console.log 'eaten'
+    #         @snake.extra = @food.value
+    #         @food = @addFood()
 
-        if @snake.bitHimself(@snake.head.x, @snake.head.y, false)
-            @gameOver()
-            return true
+    #     if @snake.bitHimself(@snake.head.x, @snake.head.y, false)
+    #         @gameOver()
+    #         return true
 
-        if @snake.head.x < 0 or @snake.head.x > 59 or @snake.head.y < 0 or @snake.head.y > 39
-            @gameOver()
-            return true
+    #     if @snake.head.x < 0 or @snake.head.x > 59 or @snake.head.y < 0 or @snake.head.y > 39
+    #         @gameOver()
+    #         return true
 
-        false 
+    #     false 
 
 
-    addFood: ->
+    addFood: (board) ->
         # board is 60 x 40 - find random position - but not occupied by snake segment
         loop
-            x = @randomInt(0, 59)
-            y = @randomInt(0, 39)
+            x = @randomInt(0, width-1)
+            y = @randomInt(0, height-1)
 
-            # check if x,y is available
-            if not @snake.bitHimself(x, y)
+            if board.get(x, y) == 0
                 break
 
-        new Food(x, y, 'orange', 10)
+        new Food(x, y, 3)
 
     gameOver: () ->
         clearInterval @processing
         document.getElementsByTagName('body')[0].className += ' tragedy'
 
     process: ->
-        @think()
+        # @think()
 
         @snake.move()
-        if @checkCollision()
-            return
+        # if @checkCollision()
+        #     return
 
-        @canvas.clear()
-        @snake.paint(@canvas.ctx)
-        @food.paint(@canvas.ctx)
+        # @canvas.clear()
+
+        @board.clear()
+        @snake.project @board
+        @food.project @board
+
+        @canvas.paint @board
+
+        # @food.paint(@canvas.ctx)
         # console.log @snake.head.x, @snake.head.y
 
     checkFourPointsAround: (point) ->
