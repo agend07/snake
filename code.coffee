@@ -6,6 +6,12 @@ headColor = 'red'
 snakeColor = 'green'
 foodColor = 'orange'
 
+
+randomInt = (lower, upper) ->
+    start = Math.random()
+    Math.floor(start * (upper - lower + 1) + lower)
+
+
 class Board
     constructor: ->
         @array = []
@@ -37,9 +43,9 @@ class Canvas
         @canvas = document.getElementById 'myCanvas'
         @ctx = @canvas.getContext '2d'
 
-    # clear: ->
-    #     @ctx.fillStyle = backgroundColor
-    #     @ctx.fillRect 0, 0, @width, @height
+    clear: ->
+        @ctx.fillStyle = backgroundColor
+        @ctx.fillRect 0, 0, @width, @height
 
     paint: (board) ->
         for y in [0...height]
@@ -62,12 +68,7 @@ class Food
 
     project: (board) ->
         board.set @x, @y, 3
-
-        console.log 'food at', @x, @y
-
-    # paint: (ctx) ->
-    #     ctx.fillStyle = @color
-    #     ctx.fillRect @x * 10, @y * 10, 10, 10 
+        # console.log 'food at', @x, @y
 
     # distance: (point) ->
     #     deltaX = (@x - point.x)
@@ -80,7 +81,7 @@ class SnakeSegment
 
 
 class Snake
-    constructor: (@direction='down') ->
+    constructor: (@direction='right') ->
         tail = new SnakeSegment(10, 12)
         middle = new SnakeSegment(10, 11, tail)
         @head = new SnakeSegment(10, 10, middle)
@@ -93,13 +94,10 @@ class Snake
             when 'down' then new SnakeSegment(@head.x, @head.y+1, @head)
 
         @head = newHead
-        # I dont move the snake - I add a new head in front
 
-        # if food was eaten and there are new segments I'm done for this cycle
-        if @extra > 0
+        if @extra > 0   # if food was eaten and there are new segments I'm done for this cycle
             @extra--
             return
-
 
         # remove last segment 
         segment = @head
@@ -110,12 +108,10 @@ class Snake
             segment = segment.next
 
     project: (board) ->
-        # board.array[@head.x][@head.y] = 2
         board.set @head.x, @head.y, 2
 
         segment = @head.next
         while segment
-            # board.array[segment.x][segment.y] = 1
             board.set segment.x, segment.y, 1
             segment = segment.next
 
@@ -133,18 +129,18 @@ class Snake
     #         segment = segment.next
     #     return false
 
-    checkPointIsOccupied: (point) ->
-        segment = @head.next
+    # checkPointIsOccupied: (point) ->
+    #     segment = @head.next
 
-        while segment
-            if segment.x == point.x and segment.y == point.y
-                return true
+    #     while segment
+    #         if segment.x == point.x and segment.y == point.y
+    #             return true
 
-            if point.x > 59 or point.x < 0 or point.y < 0 or point.y > 39
-                return true
+    #         if point.x > 59 or point.x < 0 or point.y < 0 or point.y > 39
+    #             return true
 
-            segment = segment.next
-        return false
+    #         segment = segment.next
+    #     return false
 
     countNeighbours: (point) ->
         result = 0
@@ -161,9 +157,8 @@ class Game
         # @armKeyboard()
         @canvas = new Canvas
         @board = new Board
+
         @snake = new Snake
-
-
         @snake.project @board
 
         @food = @addFood @board
@@ -174,10 +169,6 @@ class Game
         processCallback = @process.bind(this)
         @processing = setInterval processCallback, 30
 
-    randomInt: (lower, upper) ->
-        start = Math.random()
-        Math.floor(start * (upper - lower + 1) + lower)
-
     # armKeyboard: ->
     #     document.addEventListener 'keydown', (e) =>
     #         if e.keyCode == 37 and @snake.direction != 'right' then @snake.direction = 'left'
@@ -185,33 +176,30 @@ class Game
     #         if e.keyCode == 38 and @snake.direction != 'down' then @snake.direction = 'up'
     #         if e.keyCode == 40 and @snake.direction != 'up' then @snake.direction = 'down'
           
-    # checkCollision: ->
-    #     if @snake.head.x == @food.x and @snake.head.y == @food.y
-    #         console.log 'eaten'
-    #         @snake.extra = @food.value
-    #         @food = @addFood()
+    checkCollision: ->
+        if @snake.head.x == @food.x and @snake.head.y == @food.y
+            console.log 'eaten'
+            @snake.extra = @food.value
+            @food = @addFood @board
 
-    #     if @snake.bitHimself(@snake.head.x, @snake.head.y, false)
-    #         @gameOver()
-    #         return true
+        # if @snake.bitHimself(@snake.head.x, @snake.head.y, false)
+        #     @gameOver()
+        #     return true
 
-    #     if @snake.head.x < 0 or @snake.head.x > 59 or @snake.head.y < 0 or @snake.head.y > 39
-    #         @gameOver()
-    #         return true
-
-    #     false 
+        if @snake.head.x < 0 or @snake.head.x >= width or @snake.head.y < 0 or @snake.head.y >= height
+            @gameOver()
+            return true
+        false 
 
 
     addFood: (board) ->
-        # board is 60 x 40 - find random position - but not occupied by snake segment
+        # draw random position on board - but not occupied by any snake segment
         loop
-            x = @randomInt(0, width-1)
-            y = @randomInt(0, height-1)
+            x = randomInt(0, width-1)
+            y = randomInt(0, height-1)
 
             if board.get(x, y) == 0
-                break
-
-        new Food(x, y, 3)
+                return new Food(x, y, 3)
 
     gameOver: () ->
         clearInterval @processing
@@ -221,8 +209,9 @@ class Game
         # @think()
 
         @snake.move()
-        # if @checkCollision()
-        #     return
+
+        if @checkCollision()
+            return
 
         # @canvas.clear()
 
