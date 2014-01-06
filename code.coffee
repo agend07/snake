@@ -5,6 +5,10 @@ backgroundColor = 'white'
 headColor = 'red'
 snakeColor = 'green'
 foodColor = 'orange'
+checkColor = 'blue'
+
+history = null
+currentFrame = 9999999999
 
 
 randomInt = (lower, upper) ->
@@ -14,6 +18,7 @@ randomInt = (lower, upper) ->
 
 class Board
     constructor: ->
+        @notes = ''
         @array = []
 
         for _ in [0...height]
@@ -33,6 +38,28 @@ class Board
 
     set: (x, y, value) ->
         @array[y][x] = value
+
+    paintClosedArea: (point) ->
+        if point.x < 0 or point.x >= width then return
+        if point.y < 0 or point.y >= height then return
+        if @get(point.x, point.y) not in [0, 3] then return  # must be empty or food
+
+        @set(point.x, point.y, 4)
+
+        @paintClosedArea new Point(point.x, point.y+1)
+        @paintClosedArea new Point(point.x, point.y-1)
+        @paintClosedArea new Point(point.x+1, point.y)
+        @paintClosedArea new Point(point.x-1, point.y)
+
+    countBlueOnes: ->
+        result = 0
+        for y in [0...height]
+            for x in [0...width]
+                if @get(x, y) == 4
+                    result++
+                    @set(x, y, 0)
+
+        result
 
 
 class Canvas
@@ -54,6 +81,7 @@ class Canvas
                     when 1 then @ctx.fillStyle = snakeColor
                     when 2 then @ctx.fillStyle = headColor
                     when 3 then @ctx.fillStyle = foodColor
+                    when 4 then @ctx.fillStyle = checkColor
                     else @ctx.fillStyle = backgroundColor
 
                 @ctx.fillRect x * 10, y * 10, 10, 10 
@@ -144,33 +172,48 @@ class SnakeBrain
             right: new Point(x+1, y)
 
         # if some direction is illegal it will be deleted - like snake body or outside the board
+
         for own key, value of directions
             if @checkPointIsOccupied value
                 delete directions[key]
 
-        # filter directions instead of distances
-        # for own key, value of directions
-        #     if @checkForClosedSpace value
-        #         delete directions[key]
+        result = []
 
-        distances = []
-
-        for own key, value of directions
+        for own key, value of directions    # direction and point
             distance = @getDistanceToFood(value)
             neighbours = @countNeighbours(value)
-            if neighbours < 3
-                distances.push([key, distance])
 
-        distances.sort (a, b) ->
+            # if I have checking for closed space do I need this one?
+            if neighbours < 3
+                result.push([key, distance, value])
+
+        # console.log 'before: ', result
+
+        if result.length > 1
+            result = result.filter (element) =>
+                @board.paintClosedArea(element[2])
+                closed =  @board.countBlueOnes()
+
+                # console.log "#{element[0]} (#{closed}), "
+                @board.notes += "#{element[0]} (#{closed}), "
+
+                return closed > 500
+
+        # console.log 'after: ', result
+
+        result.sort (a, b) ->
             a[1] - b[1]
 
-        if distances.length > 0
-            @snake.direction = distances[0][0]
+        if result.length > 0
+            @snake.direction = result[0][0]
 
 
 
 class Game
     constructor: ->
+
+        history = []
+
         # @armKeyboard()
         @canvas = new Canvas
         @board = new Board
@@ -186,7 +229,7 @@ class Game
         @canvas.paint @board
 
         processCallback = @mainLoop.bind(this)
-        @processing = setInterval processCallback, 30
+        @processing = setInterval processCallback, 1
 
 
     mainLoop: ->
@@ -200,7 +243,12 @@ class Game
 
         @checkFoodEaten @board
 
-        @board.clear()
+        # here I could make a new board based on old one - so make a copy, and save the old one
+        # I dont even need to make a copy - just save the old one - put the old one in some buffer
+        # @board.clear()
+        history.push @board
+
+        @board = new Board
         @snake.project @board
         @food.project @board
 
@@ -213,6 +261,15 @@ class Game
             if e.keyCode == 38 and @snake.direction != 'down' then @snake.direction = 'up'
             if e.keyCode == 40 and @snake.direction != 'up' then @snake.direction = 'down'
           
+    armRewindKeyboard: ->
+        document.addEventListener 'keydown', (e) =>
+            if e.keyCode == 37 then @showFrame(-1)
+            if e.keyCode == 39 then @showFrame(1)
+            if e.keyCode == 38 then @showFrame(10)
+            if e.keyCode == 40 then @showFrame(-10)
+
+        console.log 'keyboard armed for replaying'
+
     checkCollision: (board) ->
         nextHead = switch @snake.direction
             when 'up' then new Point(@snake.head.x, @snake.head.y-1)
@@ -251,28 +308,23 @@ class Game
         clearInterval @processing
         document.getElementsByTagName('body')[0].className += ' tragedy'
 
+        @armRewindKeyboard()
+        @showFrame(0)
 
-    # checkFourPointsAround: (point) ->
-        # ta funkcja musi wiedzieć co jest już zajęte przez zamalowane punkty, nie tylko węża
-        # jak to zrobić - pierwsza myśl albo rekurencja??? - albo muszę pamiętać z której strony powstał punkt?
-        # albo mieć listę punktów i sprawdzać węża, border i te punkty - może tak byłoby najłatwiej
 
-    # checkForClosedSpace: (direction) ->
-        # console.log direction
-        # if there is more space then snakes length it might be allright
 
-        # i dont have to worry about food, only snake body, and borders
+    showFrame: (delta) ->
+        historySize = history.length - 1
+        currentFrame += delta
 
-        # it would help if i paint the closed space for some color
+        if currentFrame < 0 then currentFrame = 0
+        else if currentFrame > historySize then currentFrame = historySize
 
-        # i know where the snake is, know where the borders are, so i start with the head and start counting
-        # for example start left - if it works - it is empty - add this point to list
-        # from this point try to paint another 4 points around
-        # if it works i have four - not gonna happen but 3 or less new points
-        # and as many this new points i have to try - and as long as i get new points
-        
-        # need to have the board with chosen direction - so like would it look like if snake took this path
-        # and see 
+        board = history[currentFrame]
+
+        @canvas.paint board
+
+        console.log "#{currentFrame}: #{board.notes}"
 
 
 window.start = () ->
