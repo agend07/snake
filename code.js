@@ -97,6 +97,11 @@
       return result;
     };
 
+    Board.prototype.countClosed = function(point) {
+      this.paintClosedArea(point);
+      return this.countBlueOnes();
+    };
+
     return Board;
 
   })();
@@ -284,8 +289,7 @@
     };
 
     SnakeBrain.prototype.think = function(board, snake, food) {
-      var directions, distance, key, neighbours, result, value, x, y,
-        _this = this;
+      var closed, directions, distance, key, neighbours, result, value, x, y;
       this.board = board;
       this.snake = snake;
       this.food = food;
@@ -310,21 +314,16 @@
         value = directions[key];
         distance = this.getDistanceToFood(value);
         neighbours = this.countNeighbours(value);
+        closed = this.board.countClosed(value);
         if (neighbours < 3) {
-          result.push([key, distance, value]);
+          result.push([key, distance, closed]);
         }
-      }
-      if (result.length > 1) {
-        result = result.filter(function(element) {
-          var closed;
-          _this.board.paintClosedArea(element[2]);
-          closed = _this.board.countBlueOnes();
-          _this.board.notes += "" + element[0] + " (" + closed + "), ";
-          return closed > 500;
-        });
       }
       result.sort(function(a, b) {
         return a[1] - b[1];
+      });
+      result.sort(function(a, b) {
+        return b[2] - a[2];
       });
       if (result.length > 0) {
         return this.snake.direction = result[0][0];

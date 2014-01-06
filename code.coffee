@@ -61,6 +61,10 @@ class Board
 
         result
 
+    countClosed: (point) ->
+        @paintClosedArea(point)
+        @countBlueOnes()
+
 
 class Canvas
     width: width * 10
@@ -182,27 +186,37 @@ class SnakeBrain
         for own key, value of directions    # direction and point
             distance = @getDistanceToFood(value)
             neighbours = @countNeighbours(value)
+            closed = @board.countClosed(value)
+
+
 
             # if I have checking for closed space do I need this one?
             if neighbours < 3
-                result.push([key, distance, value])
+                result.push([key, distance, closed])
+                # result.push([key, distance, value])
 
         # console.log 'before: ', result
 
-        if result.length > 1
-            result = result.filter (element) =>
-                @board.paintClosedArea(element[2])
-                closed =  @board.countBlueOnes()
+        # if result.length > 1
+        #     result = result.filter (element) =>
+        #         @board.paintClosedArea(element[2])
+        #         closed =  @board.countBlueOnes()
 
-                # console.log "#{element[0]} (#{closed}), "
-                @board.notes += "#{element[0]} (#{closed}), "
+        #         # console.log "#{element[0]} (#{closed}), "
+        #         @board.notes += "#{element[0]} (#{closed}), "
 
-                return closed > 500
+        #         return closed > 500
 
         # console.log 'after: ', result
 
+        # sort by distance
         result.sort (a, b) ->
             a[1] - b[1]
+
+
+        # sort by closed space - reversed
+        result.sort (a, b) ->
+            b[2] - a[2]
 
         if result.length > 0
             @snake.direction = result[0][0]
